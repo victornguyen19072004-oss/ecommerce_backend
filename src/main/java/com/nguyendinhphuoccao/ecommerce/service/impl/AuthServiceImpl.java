@@ -103,17 +103,24 @@ public class AuthServiceImpl implements AuthService {
             }
         } 
         // ================= XỬ LÝ FACEBOOK =================
+        
         else if ("FACEBOOK".equals(provider)) {
             try {
                 RestTemplate restTemplate = new RestTemplate();
-                // Gọi API của Facebook để xác minh Access Token
-                String facebookGraphApiUrl = "https://graph.facebook.com/me?fields=id,name,email&access_token={token}";
+                // Bỏ access_token ra khỏi URL
+                String facebookGraphApiUrl = "https://graph.facebook.com/me?fields=id,name,email";
+                
+                // Sử dụng Bearer Token Header chuẩn bảo mật
+                org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+                headers.setBearerAuth(request.getIdToken());
+                org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(headers);
                 
                 @SuppressWarnings("rawtypes")
-                ResponseEntity<Map> response = restTemplate.getForEntity(
+                ResponseEntity<Map> response = restTemplate.exchange(
                     facebookGraphApiUrl, 
-                    Map.class, 
-                    request.getIdToken() // Truyền token vào đây để Spring Boot tự mã hóa an toàn
+                    org.springframework.http.HttpMethod.GET, 
+                    entity, 
+                    Map.class
                 );
                 
                 @SuppressWarnings("unchecked")
@@ -134,9 +141,11 @@ public class AuthServiceImpl implements AuthService {
 
                 return processOAuth2User(email, name, providerId, provider);
             } catch (Exception e) {
+                // ÉP IN LỖI RA MÀN HÌNH LOG CỦA RENDER
+                System.err.println("🚨 [LỖI FACEBOOK GRAPH API]: " + e.getMessage());
                 throw new RuntimeException("Lỗi xác thực Facebook: " + e.getMessage());
             }
-        } 
+        }
         else {
             throw new RuntimeException("Chưa hỗ trợ provider: " + provider);
         }
