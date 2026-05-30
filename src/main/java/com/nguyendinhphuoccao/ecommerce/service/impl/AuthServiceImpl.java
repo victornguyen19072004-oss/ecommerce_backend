@@ -103,25 +103,18 @@ public class AuthServiceImpl implements AuthService {
             }
         } 
         // ================= XỬ LÝ FACEBOOK =================
-        
         else if ("FACEBOOK".equals(provider)) {
             try {
-                RestTemplate restTemplate = new RestTemplate();
-                // Bỏ access_token ra khỏi URL
-                String facebookGraphApiUrl = "https://graph.facebook.com/me?fields=id,name,email";
+                // 1. Làm sạch Token: Xóa toàn bộ khoảng trắng, dấu xuống dòng ẩn từ iOS SDK
+                String cleanToken = request.getIdToken().trim().replaceAll("[\n\r]", "");
                 
-                // Sử dụng Bearer Token Header chuẩn bảo mật
-                org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-                headers.setBearerAuth(request.getIdToken());
-                org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(headers);
+                RestTemplate restTemplate = new RestTemplate();
+                
+                // 2. Nối trực tiếp token đã làm sạch vào URL (Cách tốt nhất với Facebook Graph API)
+                String facebookGraphApiUrl = "https://graph.facebook.com/me?fields=id,name,email&access_token=" + cleanToken;
                 
                 @SuppressWarnings("rawtypes")
-                ResponseEntity<Map> response = restTemplate.exchange(
-                    facebookGraphApiUrl, 
-                    org.springframework.http.HttpMethod.GET, 
-                    entity, 
-                    Map.class
-                );
+                ResponseEntity<Map> response = restTemplate.getForEntity(facebookGraphApiUrl, Map.class);
                 
                 @SuppressWarnings("unchecked")
                 Map<String, Object> payload = response.getBody();
@@ -141,7 +134,6 @@ public class AuthServiceImpl implements AuthService {
 
                 return processOAuth2User(email, name, providerId, provider);
             } catch (Exception e) {
-                // ÉP IN LỖI RA MÀN HÌNH LOG CỦA RENDER
                 System.err.println("🚨 [LỖI FACEBOOK GRAPH API]: " + e.getMessage());
                 throw new RuntimeException("Lỗi xác thực Facebook: " + e.getMessage());
             }
