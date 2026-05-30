@@ -105,13 +105,20 @@ public class AuthServiceImpl implements AuthService {
         // ================= XỬ LÝ FACEBOOK =================
         else if ("FACEBOOK".equals(provider)) {
             try {
-                // 1. Làm sạch Token: Xóa toàn bộ khoảng trắng, dấu xuống dòng ẩn từ iOS SDK
+                // 1. Làm sạch Token: Xóa khoảng trắng ẩn
                 String cleanToken = request.getIdToken().trim().replaceAll("[\n\r]", "");
+                
+                // IN RA TOKEN ĐỂ DEBUG (Xem token từ iOS có giống token từ Postman không)
+                System.out.println("🚨 [DEBUG FB TOKEN NHẬN TỪ FE]: " + cleanToken);
                 
                 RestTemplate restTemplate = new RestTemplate();
                 
-                // 2. Nối trực tiếp token đã làm sạch vào URL (Cách tốt nhất với Facebook Graph API)
-                String facebookGraphApiUrl = "https://graph.facebook.com/me?fields=id,name,email&access_token=" + cleanToken;
+                // 2. Sử dụng UriComponentsBuilder để tự động mã hóa URL chuẩn xác 100%
+                String facebookGraphApiUrl = org.springframework.web.util.UriComponentsBuilder
+                        .fromHttpUrl("https://graph.facebook.com/me")
+                        .queryParam("fields", "id,name,email")
+                        .queryParam("access_token", cleanToken)
+                        .toUriString();
                 
                 @SuppressWarnings("rawtypes")
                 ResponseEntity<Map> response = restTemplate.getForEntity(facebookGraphApiUrl, Map.class);
@@ -127,7 +134,6 @@ public class AuthServiceImpl implements AuthService {
                 String name = (String) payload.get("name");
                 String email = (String) payload.get("email");
 
-                // Đề phòng user đăng ký FB bằng số điện thoại (không có email)
                 if (email == null || email.isEmpty()) {
                     email = providerId + "@facebook.com"; 
                 }
