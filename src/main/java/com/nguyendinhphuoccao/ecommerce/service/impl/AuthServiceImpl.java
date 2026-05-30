@@ -107,10 +107,14 @@ public class AuthServiceImpl implements AuthService {
             try {
                 RestTemplate restTemplate = new RestTemplate();
                 // Gọi API của Facebook để xác minh Access Token
-                String facebookGraphApiUrl = "https://graph.facebook.com/me?fields=id,name,email&access_token=" + request.getIdToken();
+                String facebookGraphApiUrl = "https://graph.facebook.com/me?fields=id,name,email&access_token={token}";
                 
                 @SuppressWarnings("rawtypes")
-                ResponseEntity<Map> response = restTemplate.getForEntity(facebookGraphApiUrl, Map.class);
+                ResponseEntity<Map> response = restTemplate.getForEntity(
+                    facebookGraphApiUrl, 
+                    Map.class, 
+                    request.getIdToken() // Truyền token vào đây để Spring Boot tự mã hóa an toàn
+                );
                 
                 @SuppressWarnings("unchecked")
                 Map<String, Object> payload = response.getBody();
