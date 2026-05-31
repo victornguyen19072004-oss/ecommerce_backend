@@ -1,9 +1,13 @@
 package com.nguyendinhphuoccao.ecommerce.service.impl;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.databind.ObjectMapper; // Đã thêm
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -77,11 +82,13 @@ public class AuthServiceImpl implements AuthService {
     @Value("${spring.security.oauth2.client.registration.google.client-id}")
     private String googleClientId;
 
+    @Value("${spring.security.oauth2.client.registration.facebook.client-secret}")
+    private String facebookAppSecret;
+
     @Override
     public AuthResponse oauth2Login(OAuth2Request request) {
         String provider = request.getProvider().toUpperCase();
 
-        // ================= XỬ LÝ GOOGLE =================
         if ("GOOGLE".equals(provider)) {
             try {
                 GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
@@ -92,47 +99,65 @@ public class AuthServiceImpl implements AuthService {
                 if (idToken == null) throw new RuntimeException("Google ID Token không hợp lệ!");
 
                 GoogleIdToken.Payload payload = idToken.getPayload();
-                return processOAuth2User(
-                        payload.getEmail(), 
-                        (String) payload.get("name"), 
-                        payload.getSubject(), 
-                        provider
-                );
+                return processOAuth2User(payload.getEmail(), (String) payload.get("name"), payload.getSubject(), provider);
             } catch (Exception e) {
                 throw new RuntimeException("Lỗi xác thực Google: " + e.getMessage());
             }
         } 
-        // ================= XỬ LÝ FACEBOOK =================
         else if ("FACEBOOK".equals(provider)) {
             try {
-                // 1. Làm sạch Token: Xóa khoảng trắng ẩn
                 String cleanToken = request.getIdToken().trim().replaceAll("[\n\r]", "");
-                
-                // IN RA TOKEN ĐỂ DEBUG (Xem token từ iOS có giống token từ Postman không)
                 System.out.println("🚨 [DEBUG FB TOKEN NHẬN TỪ FE]: " + cleanToken);
-                
-                RestTemplate restTemplate = new RestTemplate();
-                
-                // 2. Sử dụng UriComponentsBuilder để tự động mã hóa URL chuẩn xác 100%
-                String facebookGraphApiUrl = org.springframework.web.util.UriComponentsBuilder
-                        .fromHttpUrl("https://graph.facebook.com/me")
-                        .queryParam("fields", "id,name,email")
-                        .queryParam("access_token", cleanToken)
-                        .toUriString();
-                
-                @SuppressWarnings("rawtypes")
-                ResponseEntity<Map> response = restTemplate.getForEntity(facebookGraphApiUrl, Map.class);
-                
-                @SuppressWarnings("unchecked")
-                Map<String, Object> payload = response.getBody();
 
-                if (payload == null || !payload.containsKey("id")) {
-                    throw new RuntimeException("Facebook Token không hợp lệ!");
+                String providerId = null;
+                String name = null;
+                String email = null;
+
+                // 1. Nếu token từ iPhone (Chế độ Limited Login sinh ra JWT)
+                if (cleanToken.startsWith("eyJ")) {
+                    // Cắt lấy phần Payload (phần thứ 2 của JWT)
+                    String[] chunks = cleanToken.split("\\.");
+                    java.util.Base64.Decoder decoder = java.util.Base64.getUrlDecoder();
+                    String payloadJson = new String(decoder.decode(chunks[1]), StandardCharsets.UTF_8);
+                    
+                    // Chuyển JSON thành Map
+                    ObjectMapper mapper = new ObjectMapper();
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> payload = mapper.readValue(payloadJson, Map.class);
+                    
+                    providerId = (String) payload.get("sub");
+                    name = (String) payload.get("name");
+                    email = (String) payload.get("email");
+                } 
+                // 2. Nếu token từ Android/Web (Access Token truyền thống)
+                else {
+                    String appSecretProof = generateAppSecretProof(cleanToken, facebookAppSecret);
+                    RestTemplate restTemplate = new RestTemplate();
+                    String facebookGraphApiUrl = org.springframework.web.util.UriComponentsBuilder
+                            .fromHttpUrl("https://graph.facebook.com/me")
+                            .queryParam("fields", "id,name,email")
+                            .queryParam("access_token", cleanToken)
+                            .queryParam("appsecret_proof", appSecretProof)
+                            .toUriString();
+                    
+                    @SuppressWarnings("rawtypes")
+                    ResponseEntity<Map> response = restTemplate.getForEntity(facebookGraphApiUrl, Map.class);
+                    
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> payload = response.getBody();
+
+                    if (payload == null || !payload.containsKey("id")) {
+                        throw new RuntimeException("Facebook Token không hợp lệ!");
+                    }
+
+                    providerId = (String) payload.get("id");
+                    name = (String) payload.get("name");
+                    email = (String) payload.get("email");
                 }
 
-                String providerId = (String) payload.get("id");
-                String name = (String) payload.get("name");
-                String email = (String) payload.get("email");
+                if (providerId == null) {
+                    throw new RuntimeException("Không trích xuất được ID từ Facebook.");
+                }
 
                 if (email == null || email.isEmpty()) {
                     email = providerId + "@facebook.com"; 
@@ -140,7 +165,7 @@ public class AuthServiceImpl implements AuthService {
 
                 return processOAuth2User(email, name, providerId, provider);
             } catch (Exception e) {
-                System.err.println("🚨 [LỖI FACEBOOK GRAPH API]: " + e.getMessage());
+                System.err.println("🚨 [LỖI FACEBOOK GRAPH API/JWT]: " + e.getMessage());
                 throw new RuntimeException("Lỗi xác thực Facebook: " + e.getMessage());
             }
         }
@@ -149,7 +174,18 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    // Hàm dùng chung để lưu User vào DB cho cả Google và Facebook
+    private String generateAppSecretProof(String accessToken, String appSecret) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        SecretKeySpec secretKey = new SecretKeySpec(appSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        mac.init(secretKey);
+        byte[] digest = mac.doFinal(accessToken.getBytes(StandardCharsets.UTF_8));
+        StringBuilder sb = new StringBuilder();
+        for (byte b : digest) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
+
     private AuthResponse processOAuth2User(String email, String name, String providerId, String provider) {
         Optional<StaffAccount> existingAccount = repository.findByEmail(email);
         StaffAccount account;
