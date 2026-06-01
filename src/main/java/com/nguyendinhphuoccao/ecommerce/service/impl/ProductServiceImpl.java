@@ -60,6 +60,12 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.save(product);
     }
 
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<Product> getProductsByTag(String tagName) {
+        return productRepository.findByTags_TagName(tagName.toUpperCase());
+    }
+    
     // Hàm bổ trợ xử lý chuyển đổi hoặc tự tạo Tag nếu chưa tồn tại trong DB
     private Set<Tag> getOrCreateTags(java.util.List<String> tagNames) {
         Set<Tag> tags = new HashSet<>();
