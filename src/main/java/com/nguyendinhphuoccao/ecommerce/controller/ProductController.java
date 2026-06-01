@@ -24,4 +24,10 @@ public class ProductController {
     public ResponseEntity<?> updateProduct(@PathVariable UUID id, @RequestBody ProductRequest request) {
         return ResponseEntity.ok(productService.updateProductTagsAndPrice(id, request));
     }
+
+    @GetMapping("/tag/{tagName}")
+    public ResponseEntity<java.util.List<Product>> getProductsByTag(@PathVariable String tagName) {
+        return ResponseEntity.ok(productService.getProductsByTag(tagName));
+    }
+    
 }
