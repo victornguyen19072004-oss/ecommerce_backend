@@ -1,14 +1,13 @@
 package com.nguyendinhphuoccao.ecommerce.dto;
 
-import java.math.BigDecimal;
-import java.util.Set;
-
 import lombok.Data;
+import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 public class ProductRequest {
-    private String slug;
     private String productName;
+    private String slug;
     private String sku;
     private BigDecimal salePrice;
     private BigDecimal comparePrice;
@@ -18,5 +17,5 @@ public class ProductRequest {
     private String productDescription;
     private String productType;
     private Boolean published;
-    private Set<String> tagNames; // Chỉ cần truyền mảng tên tag (VD: ["NEW", "SALE"])
+    private List<String> tags; // Chứa danh sách tên tag: ["NEW"], hoặc ["SALE"]
 }
