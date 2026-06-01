@@ -1,6 +1,7 @@
 package com.nguyendinhphuoccao.ecommerce.controller;
 
 import com.nguyendinhphuoccao.ecommerce.dto.ProductRequest;
+import com.nguyendinhphuoccao.ecommerce.entity.Product; // BỔ SUNG DÒNG NÀY
 import com.nguyendinhphuoccao.ecommerce.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -29,5 +30,4 @@ public class ProductController {
     public ResponseEntity<java.util.List<Product>> getProductsByTag(@PathVariable String tagName) {
         return ResponseEntity.ok(productService.getProductsByTag(tagName));
     }
-    
 }
