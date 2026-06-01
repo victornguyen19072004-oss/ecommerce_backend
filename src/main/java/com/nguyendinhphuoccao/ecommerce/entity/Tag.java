@@ -2,12 +2,18 @@ package com.nguyendinhphuoccao.ecommerce.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.util.Date;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import java.time.ZonedDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "tags")
-@Data @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Tag {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -19,27 +25,13 @@ public class Tag {
     @Column(columnDefinition = "TEXT")
     private String icon;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Date createdAt;
+    private ZonedDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    private Date updatedAt;
-
-    // Giữ nguyên định dạng ID thay vì load toàn bộ object StaffAccount để tối ưu
-    @Column(name = "created_by")
-    private UUID createdBy;
-
-    @Column(name = "updated_by")
-    private UUID updatedBy;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = new Date();
-        updatedAt = new Date();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = new Date();
-    }
+    private ZonedDateTime updatedAt;
+    
+    // Tạm thời bỏ qua created_by và updated_by để tập trung test chức năng Product
 }
