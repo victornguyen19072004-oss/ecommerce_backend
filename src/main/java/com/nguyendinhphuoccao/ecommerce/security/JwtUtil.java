@@ -23,6 +23,7 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
+    // Hàm cũ: Tạo Token
     public String generateToken(String email) {
         return Jwts.builder()
                 .setSubject(email)
@@ -30,5 +31,21 @@ public class JwtUtil {
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    // BỔ SUNG 1: Lấy email từ Token
+    public String getEmailFromToken(String token) {
+        return Jwts.parserBuilder().setSigningKey(getSigningKey()).build()
+                .parseClaimsJws(token).getBody().getSubject();
+    }
+
+    // BỔ SUNG 2: Kiểm tra Token hợp lệ
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
+            return true;
+        } catch (Exception e) {
+            return false; // Token hết hạn hoặc sai chữ ký
+        }
     }
 }
