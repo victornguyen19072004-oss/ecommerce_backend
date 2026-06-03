@@ -42,8 +42,9 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll() 
-                // MỞ KHÓA GET CHO FLUTTER
-                .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll() 
+                // MỞ KHÓA GET CHO FLUTTER ( TAG và Category)
+                .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/products/category/**").permitAll()
                 .anyRequest().authenticated()
             )
             // CHÈN FILTER ĐỌC TOKEN VÀO ĐÂY
